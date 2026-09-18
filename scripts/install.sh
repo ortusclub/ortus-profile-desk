@@ -23,7 +23,18 @@ if pgrep -f '/Ortus Profile Desk.app/Contents/MacOS/' >/dev/null; then
 fi
 work=$(mktemp -d "${TMPDIR:-/tmp}/ortus-install.XXXXXXXX")
 mount="$work/mount"
-cleanup() { if mount | /usr/bin/grep -F " on $mount " >/dev/null; then hdiutil detach "$mount" -quiet || true; fi; rm -rf "$work"; }
+attached=no
+cleanup() {
+  result=$?
+  if [[ "$attached" == yes ]]; then
+    if ! hdiutil detach "$mount" -quiet; then
+      echo "Installation finished; eject the Ortus disk image in Finder to clean up $work."
+      exit "$result"
+    fi
+  fi
+  rm -rf "$work"
+  exit "$result"
+}
 trap cleanup EXIT
 metadata=$(gh api "repos/$REPO/releases/latest" --jq '[.tag_name, (.assets[] | select(.name == "Ortus-Profile-Desk-universal.dmg") | .digest)] | join(" ")')
 read -r tag digest <<< "$metadata"
@@ -33,6 +44,7 @@ gh release download "$tag" --repo "$REPO" --pattern 'Ortus-Profile-Desk-universa
 actual=$(shasum -a 256 "$work/Ortus-Profile-Desk-universal.dmg" | cut -d ' ' -f 1)
 [[ "sha256:$actual" == "$digest" ]] || { echo 'Download verification failed.'; exit 1; }
 hdiutil attach "$work/Ortus-Profile-Desk-universal.dmg" -readonly -nobrowse -mountpoint "$mount" -quiet
+attached=yes
 codesign --verify --deep --strict "$mount/$APP"
 [[ "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$mount/$APP/Contents/Info.plist")" == local.profiledesk.app ]]
 [[ "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$mount/$APP/Contents/Info.plist")" == "${tag#v}" ]]
@@ -53,5 +65,5 @@ if ! mv "$staging/$APP" "$target/$APP"; then
   echo 'Installation failed; previous app restored.'; exit 1
 fi
 rm -rf "$staging"
-echo 'Installed. Saved profiles were preserved. Opening Ortus Profile Desk…'
+echo 'Installed. Saved profiles were preserved.'
 if [[ "$launch" == yes ]]; then open "$target/$APP"; fi
