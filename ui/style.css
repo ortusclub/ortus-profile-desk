@@ -2,3 +2,5 @@
 .brand{gap:10px;padding:0 3px;letter-spacing:-.3px}.brand-boat{width:44px;height:44px;flex-shrink:0}.brand-wordmark{display:flex;flex-direction:column;gap:3px;font-size:18px;white-space:nowrap}.brand-ortus{font-size:10px;letter-spacing:3px;color:#71839b;font-weight:650}
 
 .updates-panel {margin-bottom:24px;} .update-button {border:1px solid #cbd1d8;border-radius:24px;padding:9px 14px;background:transparent;text-transform:uppercase;letter-spacing:1.2px;font-size:11px;width:100%;} #update-status {font-size:11px;line-height:1.5;color:#637082;margin:9px 0 0;} #app-version {margin-bottom:10px;font-size:10px;}
+
+aside{display:flex;flex-direction:column;overflow:hidden}.brand{margin-bottom:24px}.sidebar-bottom{position:static;margin-top:auto;flex-shrink:0;padding:16px 9px 0}.updates-panel{margin-bottom:12px}#folder-list{overflow-y:auto;min-height:50px;margin:4px 0 10px}.folder{font-size:11px;padding:8px 12px;margin:0}#workspace-notice{font-size:12px;padding:12px 16px}#sync-profiles{display:block;padding-bottom:0}

@@ -1,23 +1,42 @@
 const $ = id => document.getElementById(id);
+let selectedFolder = '', settingsVersion;
 let profiles = [], remotes = [], importBusy = false, toastTimer, proxyPasswordProvided = false;
 function toast(message, error = false) {clearTimeout(toastTimer); $('toast').textContent = message; $('toast').className = error ? 'error' : ''; $('toast').hidden = false; toastTimer = setTimeout(() => $('toast').hidden = true, error ? 12000 : 4500);}
 async function perform(action) {try {return await action();} catch (err) {toast(err.message, true);}}
 function element(tag, className, text) {const el = document.createElement(tag); if (className) el.className = className; if (text != null) el.textContent = text; return el;}
 function button(label, className, action) {const el = element('button', className, label); el.addEventListener('click', () => perform(async () => {el.disabled = true; try {await action();} finally {el.disabled = false;}})); return el;}
 function view(name) {$('profiles-view').hidden = name !== 'profiles'; $('import-view').hidden = name !== 'import'; $('nav-profiles').classList.toggle('active', name === 'profiles'); $('nav-import').classList.toggle('active', name === 'import');}
-async function refresh() {profiles = await window.desk.call('profiles:list'); render();}
+async function refresh() {
+  profiles = await window.desk.call('profiles:list'); render();
+  const state = await window.desk.call('workspace:status');
+  $('workspace-notice').hidden = false;
+  $('connect-workspace').hidden = state.enabled && state.online;
+  $('sync-profiles').hidden = !state.enabled;
+  $('workspace-label').textContent = state.enabled ? (state.online ? 'Connected to Ortus' : 'Workspace offline') : 'Stored on this Mac';
+  $('workspace-heading').textContent = state.enabled ? 'YOUR SHARED WORKSPACE' : 'YOUR LOCAL WORKSPACE';
+  $('workspace-message').textContent = state.message || 'Connect your team workspace to load the company profiles and proxies.';
+}
 function render() {
   $('total-count').textContent = profiles.length; $('sidebar-count').textContent = profiles.length;
   $('open-count').textContent = profiles.filter(p => p.state !== 'closed').length;
   $('import-count').textContent = profiles.filter(p => p.sourceId).length;
+  const counts = new Map();
+  profiles.forEach(p => counts.set(p.folder || 'Unassigned', (counts.get(p.folder || 'Unassigned') || 0) + 1));
+  if (selectedFolder && !counts.has(selectedFolder)) selectedFolder = '';
+  $('folder-list').replaceChildren(); $('folders').replaceChildren();
+  for (const [folder, count] of [...counts].sort((a,b) => a[0].localeCompare(b[0]))) {
+    const b = button(`${folder} (${count})`, `nav folder${selectedFolder === folder ? ' active' : ''}`, () => {selectedFolder = folder;view('profiles');render();});
+    $('folder-list').append(b);
+    const option = element('option'); option.value = folder; $('folders').append(option);
+  }
   const query = $('search').value.toLowerCase();
-  const shown = profiles.filter(p => `${p.name} ${p.notes}`.toLowerCase().includes(query));
+  const shown = profiles.filter(p => (!selectedFolder || p.folder === selectedFolder) && `${p.name} ${p.notes} ${p.email || ''} ${p.folder || ''}`.toLowerCase().includes(query));
   $('profile-list').replaceChildren(); $('empty').hidden = profiles.length !== 0;
   if (profiles.length && !shown.length) $('profile-list').append(element('p', 'hint', 'No profiles match your search.'));
   for (const p of shown) {
     const row = element('div', 'profile-card'); row.append(element('div', 'avatar', p.name.charAt(0).toUpperCase()));
     const info = element('div', 'profile-info'); info.append(element('div', 'profile-name', p.name));
-    info.append(element('div', 'profile-meta', `${p.sourceId ? 'Imported' : 'Local'} · ${p.proxyLabel}`)); row.append(info);
+    info.append(element('div', 'profile-meta', `${p.folder || 'Unassigned'} · ${p.shared ? 'Shared' : p.sourceId ? 'Imported' : 'Local'} · ${p.proxyLabel}`)); row.append(info);
     if (p.state !== 'closed') row.append(element('span', 'badge', p.state === 'open' ? 'Open' : p.state === 'opening' ? 'Opening…' : 'Closing…'));
     else if (p.blocked || p.cookieImport?.status === 'partial') row.append(element('span', 'badge warn', p.blocked ? 'Set proxy' : 'Review import'));
     const actions = element('div', 'profile-actions');
@@ -43,6 +62,7 @@ async function editSettings(id) {
   proxyPasswordProvided = false;
   $('proxy-paste').value = ''; $('proxy-paste').setCustomValidity('');
   $('proxy-paste-hint').textContent = 'Paste all four parts at once. The fields below fill automatically.';
+  settingsVersion = p.version; $('settings-folder').value = p.folder;
   $('settings-id').value = id; $('settings-name').value = p.name; $('settings-notes').value = p.notes;
   $('settings-url').value = p.startUrl === 'about:blank' ? '' : p.startUrl;
   $('proxy-mode').value = p.proxy.mode === 'blocked' ? 'http' : p.proxy.mode;
@@ -63,13 +83,13 @@ function renderRemotes() {
     if (p.imported) row.append(element('span', '', 'Already imported')); $('remote-list').append(row);
   } updateSelection();
 }
-$('nav-profiles').onclick = () => view('profiles'); $('nav-import').onclick = $('empty-import').onclick = () => view('import');
+$('nav-profiles').onclick = () => {selectedFolder = '';view('profiles');render();}; $('nav-import').onclick = $('empty-import').onclick = () => view('import');
 $('search').oninput = render;
-$('new-profile').onclick = () => {$('profile-name').value = ''; $('new-dialog').showModal(); $('profile-name').focus();};
+$('new-profile').onclick = () => {$('profile-name').value = ''; $('profile-folder').value = selectedFolder; $('new-dialog').showModal(); $('profile-name').focus();};
 document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => $(b.dataset.close).close());
-$('create-form').onsubmit = event => {event.preventDefault(); perform(async () => {await window.desk.call('profiles:create', {name: $('profile-name').value}); $('new-dialog').close(); await refresh(); toast('Profile created. Click Open to sign in.');});};
+$('create-form').onsubmit = event => {event.preventDefault(); perform(async () => {await window.desk.call('profiles:create', {name: $('profile-name').value, folder:$('profile-folder').value}); $('new-dialog').close(); await refresh(); toast('Profile created. Click Open to sign in.');});};
 $('settings-form').onsubmit = event => {event.preventDefault(); perform(async () => {
-  await window.desk.call('profiles:update', {id: $('settings-id').value, name: $('settings-name').value, notes: $('settings-notes').value, startUrl: $('settings-url').value,
+  await window.desk.call('profiles:update', {id: $('settings-id').value, folder:$('settings-folder').value, version:settingsVersion, name: $('settings-name').value, notes: $('settings-notes').value, startUrl: $('settings-url').value,
     proxy: {mode: $('proxy-mode').value, host: $('proxy-host').value, port: $('proxy-port').value, username: $('proxy-user').value, password: $('proxy-pass').value, keepPassword: !proxyPasswordProvided && !$('proxy-pass').value}});
   $('settings-dialog').close(); await refresh(); toast('Settings saved.');
 });};
@@ -138,3 +158,15 @@ $('check-updates').onclick = () => perform(async () => {
 });
 window.desk.onUpdates(showUpdate);
 perform(async () => showUpdate(await window.desk.call('updates:status')));
+
+$('sync-profiles').onclick = () => perform(async () => {await window.desk.call('workspace:refresh');await refresh();});
+
+$('connect-workspace').onclick = () => {$('workspace-key').value = ''; $('workspace-dialog').showModal(); $('workspace-key').focus();};
+$('workspace-dialog').addEventListener('close', () => {$('workspace-key').value = '';});
+$('workspace-form').onsubmit = event => {event.preventDefault();perform(async () => {
+  $('workspace-connect-submit').disabled = true;
+  try {
+    await window.desk.call('workspace:connect', {key:$('workspace-key').value});
+    $('workspace-key').value = ''; $('workspace-dialog').close();await refresh();toast('Shared profiles and proxies loaded.');
+  } finally {$('workspace-connect-submit').disabled = false;}
+});};

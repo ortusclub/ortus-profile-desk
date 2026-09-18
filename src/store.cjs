@@ -39,7 +39,7 @@ class Store {
     return p;
   }
   list(active = new Map()) {
-    return this.data.profiles.map(p => ({id: p.id, name: p.name, notes: p.notes || '', sourceId: p.sourceId,
+    return this.data.profiles.filter(p => !p.archived || active.has(p.id)).map(p => ({id: p.id, name: p.name, folder: p.folder || 'Unassigned', email: p.email || '', shared: Boolean(p.shared), notes: p.notes || '', sourceId: p.sourceId,
       createdAt: p.createdAt, lastOpened: p.lastOpened, state: active.get(p.id)?.state || 'closed',
       proxyLabel: p.proxy.mode === 'direct' ? 'Direct connection' : p.proxy.mode === 'blocked' ? 'Proxy needs attention' : `${p.proxy.host}:${p.proxy.port}`,
       blocked: p.proxy.mode === 'blocked', report: p.report, cookieImport: p.cookieImport}));

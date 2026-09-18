@@ -8,6 +8,10 @@ app.setPath('userData', root);
 const requests = [];
 global.fetch = async (url, options) => {
   requests.push({url, method: options.method || 'GET'});
+  if (url.includes('/profile-desk/v1/')) return {ok:true,status:200,json:async()=>({revision:1,sheet:{active:2},profiles:[
+    {id:'11111111-1111-4111-8111-111111111111',name:'Shared Alice',folder:'GoLogin',email:'alice@example.test',version:1,proxy:{mode:'http',host:'192.0.2.1',port:8080,username:'fixture-user',password:'fixture-proxy-secret'}},
+    {id:'22222222-2222-4222-8222-222222222222',name:'Shared Bob',folder:'Marketing',email:'bob@example.test',version:1,proxy:{mode:'direct'}}
+  ]})};
   if (url.includes('/browser/v2')) return {ok: true, json: async () => ({allProfilesCount: 1, profiles: [{id: 'test-remote', name: '<img src=x> Imported'}]})};
   if (url.endsWith('/cookies')) return {ok: true, json: async () => [{name: 'session', value: 'fixture-secret', domain: 'example.test', session: true}]};
   return {ok: true, json: async () => ({name: '<img src=x> Imported', proxy: {mode: 'gologin'}, canvas: {mode: 'noise'}})};
@@ -73,6 +77,22 @@ app.whenReady().then(async () => {
     assert.equal(migration.profiles.length, 3); assert.equal(migration.profiles[2].blocked, true);
     assert(!JSON.stringify(migration.profiles).includes('fixture-secret'));
     assert(requests.every(r => r.method === 'GET'));
+    const workspaceCheck = await window.webContents.executeJavaScript(`(async () => {
+      await window.desk.call('workspace:connect', {key:'fixture-workspace-key-12345678901234567890'});
+      await refresh();
+      const profiles = await window.desk.call('profiles:list');
+      const settings = await window.desk.call('profiles:settings', {id:'11111111-1111-4111-8111-111111111111'});
+      const folderButtons = [...document.querySelectorAll('#folder-list button')];
+      folderButtons.find(b => b.textContent.startsWith('GoLogin')).click();
+      const filtered = document.querySelectorAll('.profile-card').length;
+      document.getElementById('nav-profiles').click();
+      return {shared:profiles.filter(p=>p.shared).length,folderCount:folderButtons.length,filtered,
+        passwordHidden:settings.proxy.password === '' && settings.proxy.hasPassword,
+        connected:document.getElementById('workspace-label').textContent};
+    })()`);
+    assert.deepEqual(workspaceCheck,{shared:2,folderCount:3,filtered:1,passwordHidden:true,connected:'Connected to Ortus'});
+    assert(!fs.readFileSync(path.join(root,'vault/profiles.vault')).includes(Buffer.from('fixture-workspace-key')));
+    console.log('PASS: workspace key connection, encrypted key storage, shared proxies and folder filtering.');
     await window.webContents.executeJavaScript('refresh()');
     assert.equal(await window.webContents.executeJavaScript('document.querySelectorAll(".profile-card img").length'), 0);
     await new Promise(resolve => setTimeout(resolve, 300));

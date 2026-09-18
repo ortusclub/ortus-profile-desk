@@ -3,6 +3,8 @@ const path = require('node:path');
 const {pathToFileURL} = require('node:url');
 const {Store} = require('./store.cjs');
 const {Updates} = require('./updates.cjs');
+const {TeamClient} = require('./team-client.cjs');
+let team;
 let updates;
 const {BrowserManager} = require('./browser.cjs');
 const {GoLoginAPI, validateProxy, safeStartUrl} = require('./migration.cjs');
@@ -22,7 +24,13 @@ else {
       store = new Store(path.join(app.getPath('userData'), 'vault'), safeStorage);
       browsers = new BrowserManager(store, () => { if (window && !window.isDestroyed()) window.webContents.send('profiles-changed'); });
       updates = new Updates(app, state => { if (window && !window.isDestroyed()) window.webContents.send('updates-changed', state); });
+      const config = store.data.workspace || null;
+      if (config) {
+        team = new TeamClient(store, config, browsers.active, () => {if (window && !window.isDestroyed()) window.webContents.send('profiles-changed');});
+      }
+      setInterval(() => team?.refresh().catch(() => {}), 10000).unref();
       registerIPC(); createWindow();
+      team?.refresh().catch(() => {});
       if (app.isPackaged) {setTimeout(() => updates.check(), 15000).unref(); setInterval(() => updates.check(), 4 * 60 * 60 * 1000).unref();}
       Menu.setApplicationMenu(Menu.buildFromTemplate([
         {label: 'Ortus Profile Desk', submenu: [{role: 'about'}, {type: 'separator'}, {role: 'hide'}, {role: 'hideOthers'}, {role: 'unhide'}, {type: 'separator'}, {role: 'quit'}]},
@@ -88,25 +96,39 @@ function registerIPC() {
     if (importing || browsers.active.size) throw new Error('Close all profiles and wait for imports to finish before updating.');
     await updates.install(); app.quit();
   });
-  handle('profiles:list', () => store.list(browsers.active));
-  handle('profiles:create', ({name}) => {
-    if (typeof name !== 'string' || !name.trim() || name.length > 160) throw new Error('Enter a profile name of up to 160 characters.');
-    store.add({name: name.trim(), notes: '', proxy: {mode: 'direct'}, startUrl: '', cookies: [], cookieImport: {status: 'none'}});
+  handle('workspace:connect', async ({key}) => {
+    if (typeof key !== 'string' || !/^[a-zA-Z0-9_-]{32,150}$/.test(key.trim())) throw new Error('Paste the workspace key supplied by your team administrator.');
+    if (browsers.active.size) throw new Error('Close profile windows before connecting the workspace.');
+    const config = {baseUrl:'https://scraper.ortusclub.com/profile-desk/v1',token:key.trim()};
+    const candidate = new TeamClient(store,config,browsers.active,() => {if (window && !window.isDestroyed()) window.webContents.send('profiles-changed');});
+    await candidate.refresh();
+    store.data.workspace = config;store.save();team = candidate;
+    return team.status;
   });
-  handle('profiles:open', async ({id}) => {await browsers.open(id);});
+  handle('workspace:status', () => team?.status || {enabled:false});
+  handle('workspace:refresh', () => team?.refresh());
+  handle('profiles:list', () => store.list(browsers.active));
+  handle('profiles:create', async ({name, folder}) => {
+    if (typeof name !== 'string' || !name.trim() || name.length > 160) throw new Error('Enter a profile name of up to 160 characters.');
+    if (team) return team.create({name:name.trim(), folder, proxy:{mode:'direct'}});
+    store.add({folder: String(folder || 'Unassigned').slice(0,300), name: name.trim(), notes: '', proxy: {mode: 'direct'}, startUrl: '', cookies: [], cookieImport: {status: 'none'}});
+  });
+  handle('profiles:open', async ({id}) => {if (store.get(id).shared) await team?.beforeOpen(id); await browsers.open(id);});
   handle('profiles:close', async ({id}) => {await browsers.close(id);});
   handle('profiles:settings', ({id}) => {
     const p = store.get(id);
-    return {id, name: p.name, notes: p.notes || '', startUrl: p.startUrl || '', proxy: {...p.proxy, password: '', hasPassword: Boolean(p.proxy.password)}};
+    return {id, folder:p.folder || 'Unassigned', version:p.remoteVersion, name: p.name, notes: p.notes || '', startUrl: p.startUrl || '', proxy: {...p.proxy, password: '', hasPassword: Boolean(p.proxy.password)}};
   });
-  handle('profiles:update', ({id, name, notes, startUrl, proxy}) => {
+  handle('profiles:update', async ({id, name, folder, version, notes, startUrl, proxy}) => {
     if (browsers.active.has(id)) throw new Error('Close the profile before changing its settings.');
     if (typeof name !== 'string' || !name.trim() || name.length > 160) throw new Error('Enter a profile name of up to 160 characters.');
     if (typeof notes !== 'string' || notes.length > 10000) throw new Error('Notes are too long.');
     if (startUrl && safeStartUrl(startUrl) === 'about:blank') throw new Error('Start page must be an http:// or https:// address.');
     const old = store.get(id).proxy;
     if (proxy.keepPassword && proxy.mode === old.mode && proxy.host === old.host && Number(proxy.port) === old.port && proxy.username === old.username) proxy.password = old.password;
-    store.update(id, {name: name.trim(), notes, startUrl, proxy: validateProxy(proxy)});
+    const changes = {name:name.trim(), folder:String(folder || 'Unassigned').slice(0,300), notes, startUrl, proxy:validateProxy(proxy)};
+    if (store.get(id).shared) return team.update(id, {...changes,email:store.get(id).email},version);
+    store.update(id, changes);
   });
   handle('gologin:connect', async ({token}) => {
     if (importing) throw new Error('Wait for the current import to finish.');

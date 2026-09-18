@@ -81,20 +81,23 @@ Paste proxies in profile settings as `host:port:username:password`. The connecti
 
 The displayed name is Ortus Profile Desk. Its original internal identity and data-directory name remain Profile Desk so existing encrypted profiles continue working.
 
-## Private team installation and updates
+## Team installation and updates
 
-The private installer is distributed through [team releases](https://github.com/ortusclub/ortus-profile-desk-team/releases). Team members need a GitHub account with access to that repository and GitHub CLI. This authenticates downloads only; it is not an app workspace login.
+Both repositories are private. Developers work in [ortus-profile-desk](https://github.com/ortusclub/ortus-profile-desk); [ortus-profile-desk-team](https://github.com/ortusclub/ortus-profile-desk-team) distributes installers.
 
-Run in Terminal:
+Install GitHub CLI (`brew install gh`, or https://cli.github.com), then run:
 
 ```sh
-installer=$(mktemp) && curl -fsSL https://raw.githubusercontent.com/ortusclub/ortus-profile-desk/main/scripts/install.sh -o "$installer" && bash "$installer"
+gh auth login --hostname github.com --web --git-protocol https
+installer=$(mktemp) && gh api repos/ortusclub/ortus-profile-desk-team/contents/install.sh -H "Accept: application/vnd.github.raw" > "$installer" && bash "$installer"
 ```
 
-The script installs GitHub CLI through Homebrew if available, prompts for GitHub sign-in if needed, verifies the release checksum and application bundle, and installs in Applications without deleting saved profiles. Without Homebrew, install GitHub CLI from https://cli.github.com first. Google Chrome is also required to open profiles.
+The GitHub account must have access to the private team repository. The installer verifies the private release and preserves existing profiles. Google Chrome and macOS 13+ are required. If macOS blocks this ad-hoc signed app, use System Settings → Privacy & Security → Open Anyway for the trusted team download.
 
-The app displays its version and **Check for updates** in the sidebar. Packaged builds check at startup and every four hours, automatically download newer stable private releases, and offer **Restart to update**. Close all profile windows before restarting. Updates never deliberately interrupt open browser sessions. The user's GitHub CLI credentials are used; no GitHub token is embedded in the app. There is no public-release fallback.
+In version 0.1.4+, click **Connect team workspace** and enter the workspace key from your administrator. The app loads active sheet accounts, grouped by VM Account, with their proxy credentials. The key is saved in the Mac's Keychain-encrypted vault; it is never included in the installer or repository. The server reads the account sheet every five minutes; connected apps refresh every ten seconds. Newly created shared profiles and changed proxy settings appear on other Macs automatically.
 
-Builds currently use ad-hoc signatures and are not Apple-notarized. If macOS blocks opening the app, use System Settings → Privacy & Security → Open Anyway for a trusted team download. The updater verifies downloads against the authenticated GitHub release digest, checks the bundle identity/version and signature integrity, and stages a replacement alongside the installed app. The prior build is retained inside its `.ortus-update-*` staging directory for manual recovery. If an update cannot restart, rerun the Terminal installer.
+Only rows with a populated proxy field receive a proxy. Blank proxy fields use direct connections. Account passwords and 2FA codes are not imported. Browser cookies and site storage remain local in this version; browser-session transfer is not enabled yet.
 
-Version 0.1.3 adds installation/update support only. Shared profiles and browser-session synchronization are still under development; this release retains local profile storage.
+The sidebar shows the app version and **Check for updates**. Packaged builds automatically check at startup and every four hours, download newer private releases, and offer **Restart to update** after all profile windows are closed. GitHub CLI must remain signed into an authorized account. If updating fails, rerun the Terminal installer.
+
+See [DEVELOPING.md](DEVELOPING.md) for source layout, development, tests and deployment notes.

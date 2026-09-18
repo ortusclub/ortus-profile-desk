@@ -1,0 +1,102 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: profile-desk-data
+  namespace: salesnav-scraper
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: standard-rwo
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: profile-desk
+  namespace: salesnav-scraper
+spec:
+  timeoutSec: 60
+  healthCheck:
+    type: HTTP
+    requestPath: /healthz
+    port: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: profile-desk
+  namespace: salesnav-scraper
+  annotations:
+    cloud.google.com/neg: '{"ingress":true}'
+    cloud.google.com/backend-config: '{"default":"profile-desk"}'
+spec:
+  selector:
+    app: profile-desk
+  ports:
+    - port: 80
+      targetPort: 3000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: profile-desk
+  namespace: salesnav-scraper
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: profile-desk
+  template:
+    metadata:
+      labels:
+        app: profile-desk
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: profile-desk
+          image: asia-southeast1-docker.pkg.dev/salesnav-scraper-prod/salesnav-images/profile-desk:0.1.4
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - secretRef:
+                name: profile-desk-config
+          env:
+            - name: DATA_DIR
+              value: /data
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: '1'
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+            initialDelaySeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+            initialDelaySeconds: 20
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: profile-desk-data
