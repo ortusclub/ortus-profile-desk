@@ -1,6 +1,6 @@
 # Shared profiles: planned next step
 
-Status: not implemented or deployed. The current application stores profiles on one Mac.
+Status: shared service not deployed. The current application stores profiles on one Mac. A tested spreadsheet mapper is implemented in `src/sheet-profiles.cjs`.
 
 ## Requested behavior
 
@@ -12,9 +12,10 @@ Status: not implemented or deployed. The current application stores profiles on 
 
 ## Decisions needed
 
-1. Are users on different Macs or on the same Mac?
-2. If different Macs, choose a host: an existing Ortus server, this Mac while online, or a new hosted service.
-3. Choose public source/release distribution or a private repository.
+1. Choose the shared-service host: an existing Ortus server or a new hosted service.
+2. Confirm whether synchronization means profile lists/settings/saved sessions or live browser mirroring.
+
+Confirmed: different team Macs, no personal logins initially, a private team-only installer with preconfigured workspace access. Public generic source remains separate. Private release repository: `ortusclub/ortus-profile-desk-team`.
 
 ## Implementation requirements
 
@@ -27,3 +28,15 @@ Status: not implemented or deployed. The current application stores profiles on 
 - Stored profile data must be protected in transit and on the server. Keep the API structured around workspace membership so account authentication can be added later.
 
 Exact GoLogin fingerprint cloning and device-bound sign-in transfer remain outside the current app’s capabilities.
+
+## Sheet mapping
+
+- Use the selected account tab, not the spreadsheet overview tab.
+- Select rows whose trimmed Status equals Active, case-insensitively.
+- Use Email as the stable account identifier and Full Name as the display name.
+- Group by the trimmed VM Account value; blank values belong to Unassigned.
+- Read supported proxy strings from Proxy Details. Invalid proxies block opening.
+- Do not import account passwords or 2FA columns.
+- Preserve profile identity across row reordering, renaming, and folder changes.
+- Duplicate active emails or missing required identifiers block the sync rather than mix account sessions.
+- The live spreadsheet URL and rows are runtime configuration/data; do not publish them in source or releases.
