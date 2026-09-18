@@ -6,7 +6,7 @@ Version 0.1.4 shares profile names, folders, proxy settings and newly created pr
 
 - The server maintains the shared catalog on a separate encrypted persistent volume.
 - Active account-sheet rows are imported every five minutes. The account tab must be specified using its gid.
-- Email provides stable identity; Full Name supplies the display name. VM Account supplies the folder; blank values use Unassigned.
+- Email provides both the stable identity and the displayed profile name. VM Account supplies the folder; blank values use Unassigned.
 - Proxy Details supplies host, port, username and password. Malformed values block opening. Blank values use direct connections.
 - Account passwords and 2FA columns are excluded.
 - Inactive accounts are archived, preserving their data. Empty or invalid sheet results do not erase the previous catalog.

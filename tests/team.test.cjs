@@ -17,7 +17,7 @@ test('sheet profiles retain identity and sessions while proxies and folders chan
  assert(!JSON.stringify(db.data).includes('excluded-password'));
  assert(!fs.readFileSync(db.file).includes(Buffer.from('proxy-secret')));
  await sync(csv.replace('Alice,GoLogin,192.0.2.1:8080:test:proxy-secret','Alicia,New folder,192.0.2.2:9000:test:changed'));
- assert.equal(db.list()[0].id,p.id);assert.equal(db.list()[0].folder,'New folder');assert.equal(db.list()[0].proxy.password,'changed');
+ assert.equal(db.list()[0].name,'a@example.test');assert.equal(db.list()[0].id,p.id);assert.equal(db.list()[0].folder,'New folder');assert.equal(db.list()[0].proxy.password,'changed');
  assert.throws(()=>db.update(p.id,{...p,name:'stale'}),/Another Mac/);
  await sync(csv.replace('a@example.test,Active','a@example.test,Inactive'));assert.equal(db.list().length,1);assert(db.get(p.id).archived);
  assert.equal(new Database(root,key).list().length,1);

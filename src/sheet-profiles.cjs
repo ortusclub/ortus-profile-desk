@@ -33,8 +33,8 @@ function sheetLocation(input) {
 function accountRows(csv, source) {
   const rows = parseCSV(csv);
   const headings = (rows.shift() || []).map(v => v.trim().toLowerCase());
-  const required = ['email', 'status', 'full name', 'vm account'];
-  if (required.some(h => !headings.includes(h))) throw new Error('This tab must contain Email, Status, Full Name and VM Account columns.');
+  const required = ['email', 'status', 'vm account'];
+  if (required.some(h => !headings.includes(h))) throw new Error('This tab must contain Email, Status and VM Account columns.');
   for (const h of required) if (headings.indexOf(h) !== headings.lastIndexOf(h)) throw new Error(`Duplicate ${h} columns make this sheet ambiguous.`);
   const get = (row, name) => String(row[headings.indexOf(name)] || '').trim();
   const seen = new Set(), profiles = [], inactiveKeys = new Set();
@@ -48,8 +48,7 @@ function accountRows(csv, source) {
     if (status !== 'active') {inactiveKeys.add(sourceKey); continue;}
     if (seen.has(email)) throw new Error('Two active rows have the same email. Resolve the duplicate before syncing.');
     seen.add(email);
-    const name = get(row, 'full name');
-    if (!name) throw new Error('An active row has no Full Name. No profile changes were applied.');
+    const name = email;
     const rawProxy = get(row, 'proxy details');
     let proxy = {mode: 'direct'};
     if (rawProxy) {

@@ -62,7 +62,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: profile-desk
-          image: asia-southeast1-docker.pkg.dev/salesnav-scraper-prod/salesnav-images/profile-desk:0.1.4
+          image: asia-southeast1-docker.pkg.dev/salesnav-scraper-prod/salesnav-images/profile-desk:0.1.4-email
           ports:
             - containerPort: 3000
           envFrom:

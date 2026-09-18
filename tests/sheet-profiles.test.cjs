@@ -7,7 +7,7 @@ test('only active rows produce profiles, grouped by the exact VM Account value, 
   const data = accountRows(header + 'one@example.test,Active,One,GoLogin,192.0.2.1:8080:user:proxy-password,ACCOUNT-SECRET,TOTP-SECRET\n' +
     'two@example.test,Identity Restricted,Two,GoLogin,,,\nthree@example.test, active ,Three,,,,', source);
   assert.equal(data.profiles.length, 2); assert.deepEqual(data.summary.folders, {GoLogin: 1, Unassigned: 1});
-  assert.equal(data.profiles[0].proxy.password, 'proxy-password'); assert.equal(data.inactiveKeys.length, 1);
+  assert.equal(data.profiles[0].name, 'one@example.test'); assert.equal(data.profiles[0].proxy.password, 'proxy-password'); assert.equal(data.inactiveKeys.length, 1);
   assert(!JSON.stringify(data).includes('ACCOUNT-SECRET')); assert(!JSON.stringify(data).includes('TOTP-SECRET'));
 });
 test('profile identity survives row reordering, renaming and moving folders', () => {
