@@ -28,7 +28,7 @@ trap cleanup EXIT
 metadata=$(gh api "repos/$REPO/releases/latest" --jq '[.tag_name, (.assets[] | select(.name == "Ortus-Profile-Desk-universal.dmg") | .digest)] | join(" ")')
 read -r tag digest <<< "$metadata"
 [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ && "$digest" =~ ^sha256:[a-f0-9]{64}$ ]] || { echo 'No verified team installer is published yet.'; exit 1; }
-echo "Downloading Ortus Profile Desk $tag…"
+echo "Downloading Ortus Profile Desk ${tag}…"
 gh release download "$tag" --repo "$REPO" --pattern 'Ortus-Profile-Desk-universal.dmg' --dir "$work"
 actual=$(shasum -a 256 "$work/Ortus-Profile-Desk-universal.dmg" | cut -d ' ' -f 1)
 [[ "sha256:$actual" == "$digest" ]] || { echo 'Download verification failed.'; exit 1; }
