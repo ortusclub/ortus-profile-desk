@@ -30,6 +30,17 @@ app.whenReady().then(async () => {
       return {count: profiles.length, bridge: Boolean(window.desk), nodeHidden: typeof require === 'undefined', title: document.title};
     })()`);
     assert.equal(result.count, 2); assert(result.bridge); assert(result.nodeHidden); assert.equal(result.title, 'Ortus Profile Desk');
+    const updateCheck = await window.webContents.executeJavaScript(`(async () => {
+      const state = await window.desk.call('updates:status');
+      const result = await window.desk.call('updates:check');
+      let refusesUnprepared = false;
+      try { await window.desk.call('updates:install'); } catch { refusesUnprepared = true; }
+      return {version: state.version, status: result.status, refusesUnprepared,
+        label: document.getElementById('check-updates').textContent};
+    })()`);
+    assert.equal(updateCheck.status, 'unavailable'); assert(updateCheck.refusesUnprepared);
+    assert.equal(updateCheck.label, 'Check for updates');
+    console.log('PASS: update controls, isolated update IPC and unprepared restart rejection.');
     const pasteCheck = await window.webContents.executeJavaScript(`(async () => {
       const profiles = await window.desk.call('profiles:list');
       await editSettings(profiles[0].id);

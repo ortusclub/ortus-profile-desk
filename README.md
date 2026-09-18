@@ -80,3 +80,21 @@ Only read-only `GET` requests are used for migration. Redirects are rejected to 
 Paste proxies in profile settings as `host:port:username:password`. The connection fields fill automatically; direct profiles switch to HTTP. Choose HTTPS if required by your provider.
 
 The displayed name is Ortus Profile Desk. Its original internal identity and data-directory name remain Profile Desk so existing encrypted profiles continue working.
+
+## Private team installation and updates
+
+The private installer is distributed through [team releases](https://github.com/ortusclub/ortus-profile-desk-team/releases). Team members need a GitHub account with access to that repository and GitHub CLI. This authenticates downloads only; it is not an app workspace login.
+
+Run in Terminal:
+
+```sh
+installer=$(mktemp) && curl -fsSL https://raw.githubusercontent.com/ortusclub/ortus-profile-desk/main/scripts/install.sh -o "$installer" && bash "$installer"
+```
+
+The script installs GitHub CLI through Homebrew if available, prompts for GitHub sign-in if needed, verifies the release checksum and application bundle, and installs in Applications without deleting saved profiles. Without Homebrew, install GitHub CLI from https://cli.github.com first. Google Chrome is also required to open profiles.
+
+The app displays its version and **Check for updates** in the sidebar. Packaged builds check at startup and every four hours, automatically download newer stable private releases, and offer **Restart to update**. Close all profile windows before restarting. Updates never deliberately interrupt open browser sessions. The user's GitHub CLI credentials are used; no GitHub token is embedded in the app. There is no public-release fallback.
+
+Builds currently use ad-hoc signatures and are not Apple-notarized. If macOS blocks opening the app, use System Settings → Privacy & Security → Open Anyway for a trusted team download. The updater verifies downloads against the authenticated GitHub release digest, checks the bundle identity/version and signature integrity, and stages a replacement alongside the installed app. The prior build is retained inside its `.ortus-update-*` staging directory for manual recovery. If an update cannot restart, rerun the Terminal installer.
+
+Version 0.1.3 adds installation/update support only. Shared profiles and browser-session synchronization are still under development; this release retains local profile storage.

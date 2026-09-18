@@ -2,6 +2,8 @@ const {app, BrowserWindow, ipcMain, dialog, safeStorage, Menu, shell} = require(
 const path = require('node:path');
 const {pathToFileURL} = require('node:url');
 const {Store} = require('./store.cjs');
+const {Updates} = require('./updates.cjs');
+let updates;
 const {BrowserManager} = require('./browser.cjs');
 const {GoLoginAPI, validateProxy, safeStartUrl} = require('./migration.cjs');
 
@@ -19,7 +21,9 @@ else {
       if (!safeStorage.isEncryptionAvailable()) throw new Error('macOS Keychain encryption is unavailable. Unlock your login keychain and reopen Ortus Profile Desk.');
       store = new Store(path.join(app.getPath('userData'), 'vault'), safeStorage);
       browsers = new BrowserManager(store, () => { if (window && !window.isDestroyed()) window.webContents.send('profiles-changed'); });
+      updates = new Updates(app, state => { if (window && !window.isDestroyed()) window.webContents.send('updates-changed', state); });
       registerIPC(); createWindow();
+      if (app.isPackaged) {setTimeout(() => updates.check(), 15000).unref(); setInterval(() => updates.check(), 4 * 60 * 60 * 1000).unref();}
       Menu.setApplicationMenu(Menu.buildFromTemplate([
         {label: 'Ortus Profile Desk', submenu: [{role: 'about'}, {type: 'separator'}, {role: 'hide'}, {role: 'hideOthers'}, {role: 'unhide'}, {type: 'separator'}, {role: 'quit'}]},
         {label: 'Edit', submenu: [{role: 'undo'}, {role: 'redo'}, {type: 'separator'}, {role: 'cut'}, {role: 'copy'}, {role: 'paste'}, {role: 'selectAll'}]},
@@ -78,6 +82,12 @@ function handle(name, action) {
 }
 
 function registerIPC() {
+  handle('updates:status', () => updates.state);
+  handle('updates:check', () => updates.check());
+  handle('updates:install', async () => {
+    if (importing || browsers.active.size) throw new Error('Close all profiles and wait for imports to finish before updating.');
+    await updates.install(); app.quit();
+  });
   handle('profiles:list', () => store.list(browsers.active));
   handle('profiles:create', ({name}) => {
     if (typeof name !== 'string' || !name.trim() || name.length > 160) throw new Error('Enter a profile name of up to 160 characters.');

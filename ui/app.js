@@ -123,3 +123,18 @@ $('reveal').onclick = () => perform(() => window.desk.call('data:reveal'));
 window.desk.onProfiles(() => perform(refresh));
 window.desk.onProgress(p => $('import-progress').textContent = `Imported ${p.completed} of ${p.total} · ${p.name}`);
 perform(refresh);
+
+let updateState;
+function showUpdate(state) {
+  updateState = state;
+  $('app-version').textContent = `ORTUS PROFILE DESK · V${state.version}`;
+  $('update-status').textContent = state.message;
+  $('check-updates').textContent = state.status === 'ready' ? 'Restart to update' : state.status === 'downloading' ? 'Downloading…' : 'Check for updates';
+  $('check-updates').disabled = ['checking', 'downloading'].includes(state.status);
+}
+$('check-updates').onclick = () => perform(async () => {
+  if (updateState?.status === 'ready') await window.desk.call('updates:install');
+  else showUpdate(await window.desk.call('updates:check'));
+});
+window.desk.onUpdates(showUpdate);
+perform(async () => showUpdate(await window.desk.call('updates:status')));
