@@ -2,11 +2,17 @@
 
 A standalone Mac profile manager. Each profile opens in Google Chrome with a separate persistent browser-data directory. GoLogin is used only for a one-time import; local profiles do not use its SDK, Orbita, account, or cloud storage.
 
+## Download for Mac
+
+[Download the latest installer](https://github.com/ortusclub/ortus-profile-desk/releases/latest). Open the DMG and drag **Ortus Profile Desk** into Applications.
+
+The installer includes both Intel and Apple Silicon support. This initial build is locally signed but not Apple-notarized; macOS may require you to allow it in System Settings → Privacy & Security.
+
 ## Requirements
 
 - macOS 13 or newer.
 - Google Chrome installed.
-- Current build: Apple Silicon. The universal release build command supports Intel and Apple Silicon.
+- The downloadable universal installer supports Intel and Apple Silicon.
 
 Shared profiles across Macs are planned but not implemented. See [shared-profile requirements](SHARED-PROFILES.md).
 
