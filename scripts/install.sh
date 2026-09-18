@@ -1,5 +1,5 @@
 #!/bin/bash
-# Private team installer. GitHub credentials stay in the user's gh credential store.
+# Public installer. Workspace access still requires a separately supplied key.
 set -euo pipefail
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 REPO=ortusclub/ortus-profile-desk-team
@@ -13,11 +13,6 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 if [[ -n "$install_dir" && "$install_dir" != /* ]]; then echo 'Installation directory must be absolute.'; exit 1; fi
-if ! command -v gh >/dev/null; then
-  if command -v brew >/dev/null; then brew install gh
-  else echo 'Install GitHub CLI from https://cli.github.com, then run this command again.'; exit 1; fi
-fi
-gh auth status >/dev/null 2>&1 || gh auth login --hostname github.com --web --git-protocol https
 if pgrep -f '/Ortus Profile Desk.app/Contents/MacOS/' >/dev/null; then
   echo 'Quit Ortus Profile Desk before installing. Your saved profiles will be kept.'; exit 1
 fi
@@ -36,11 +31,13 @@ cleanup() {
   exit "$result"
 }
 trap cleanup EXIT
-metadata=$(gh api "repos/$REPO/releases/latest" --jq '[.tag_name, (.assets[] | select(.name == "Ortus-Profile-Desk-universal.dmg") | .digest)] | join(" ")')
-read -r tag digest <<< "$metadata"
-[[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ && "$digest" =~ ^sha256:[a-f0-9]{64}$ ]] || { echo 'No verified team installer is published yet.'; exit 1; }
+curl -fsSL --proto '=https' --proto-redir '=https' --connect-timeout 20 --max-time 60 "https://github.com/$REPO/releases/latest/download/install.json" -o "$work/install.json"
+version=$(/usr/bin/plutil -extract version raw -o - "$work/install.json")
+sha=$(/usr/bin/plutil -extract sha256 raw -o - "$work/install.json")
+[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && "$sha" =~ ^[a-f0-9]{64}$ ]] || { echo 'Installer metadata is invalid.'; exit 1; }
+tag="v$version"; digest="sha256:$sha"
 echo "Downloading Ortus Profile Desk ${tag}…"
-gh release download "$tag" --repo "$REPO" --pattern 'Ortus-Profile-Desk-universal.dmg' --dir "$work"
+curl -fL --proto '=https' --proto-redir '=https' --connect-timeout 20 --max-time 900 --progress-bar "https://github.com/$REPO/releases/download/$tag/Ortus-Profile-Desk-universal.dmg" -o "$work/Ortus-Profile-Desk-universal.dmg"
 actual=$(shasum -a 256 "$work/Ortus-Profile-Desk-universal.dmg" | cut -d ' ' -f 1)
 [[ "sha256:$actual" == "$digest" ]] || { echo 'Download verification failed.'; exit 1; }
 hdiutil attach "$work/Ortus-Profile-Desk-universal.dmg" -readonly -nobrowse -mountpoint "$mount" -quiet

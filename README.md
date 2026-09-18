@@ -81,23 +81,22 @@ Paste proxies in profile settings as `host:port:username:password`. The connecti
 
 The displayed name is Ortus Profile Desk. Its original internal identity and data-directory name remain Profile Desk so existing encrypted profiles continue working.
 
-## Team installation and updates
+## Installation and updates
 
-Both repositories are private. Developers work in [ortus-profile-desk](https://github.com/ortusclub/ortus-profile-desk); [ortus-profile-desk-team](https://github.com/ortusclub/ortus-profile-desk-team) distributes installers.
+The application and installer are public. Workspace profiles and proxy credentials are stored separately on the authenticated server. No workspace key or account data is included in the installer.
 
-Install GitHub CLI (`brew install gh`, or https://cli.github.com), then run:
+Run this stable command in Terminal:
 
 ```sh
-gh auth login --hostname github.com --web --git-protocol https
-installer=$(mktemp) && gh api repos/ortusclub/ortus-profile-desk-team/contents/install.sh -H "Accept: application/vnd.github.raw" > "$installer" && bash "$installer"
+installer=$(mktemp) && curl -fsSL https://raw.githubusercontent.com/ortusclub/ortus-profile-desk-team/main/install.sh -o "$installer" && bash "$installer"
 ```
 
-The GitHub account must have access to the private team repository. The installer verifies the private release and preserves existing profiles. Google Chrome and macOS 13+ are required. If macOS blocks this ad-hoc signed app, use System Settings → Privacy & Security → Open Anyway for the trusted team download.
+The command always downloads the latest release. No GitHub account, GitHub CLI or Homebrew is required. It verifies the checksum and app signature before installation and preserves saved profiles. Requires macOS 13+ and Google Chrome; supports Intel and Apple Silicon. Builds are currently ad-hoc signed, not Apple-notarized. If macOS blocks the trusted download, use System Settings → Privacy & Security → Open Anyway.
 
-In version 0.1.4+, click **Connect team workspace** and enter the workspace key from your administrator. The app loads active sheet accounts, grouped by VM Account, with their proxy credentials. The key is saved in the Mac's Keychain-encrypted vault; it is never included in the installer or repository. The server reads the account sheet every five minutes; connected apps refresh every ten seconds. Newly created shared profiles and changed proxy settings appear on other Macs automatically.
+Click **Connect team workspace** and enter the key provided by your team administrator. The app loads active sheet accounts using their email addresses as names, grouped by VM Account, with proxy credentials from the spreadsheet. The key is saved in the Mac's Keychain-encrypted vault. The server refreshes the sheet every five minutes; connected apps refresh every ten seconds. New shared profiles and settings changes propagate between Macs.
 
-Only rows with a populated proxy field receive a proxy. Blank proxy fields use direct connections. Account passwords and 2FA codes are not imported. Browser cookies and site storage remain local in this version; browser-session transfer is not enabled yet.
+Blank spreadsheet proxy fields use direct connections. Browser cookies and site storage remain local; browser-session transfer is not enabled yet.
 
-The sidebar shows the app version and **Check for updates**. Packaged builds automatically check at startup and every four hours, download newer private releases, and offer **Restart to update** after all profile windows are closed. GitHub CLI must remain signed into an authorized account. If updating fails, rerun the Terminal installer.
+The sidebar provides **Check for updates** and guided progress through Download → Verify → Prepare → Restart. Version 0.1.6+ downloads updates without GitHub sign-in. Earlier builds can upgrade using the Terminal command above. Close profile windows before restarting to update.
 
-See [DEVELOPING.md](DEVELOPING.md) for source layout, development, tests and deployment notes.
+Developers work in [ortus-profile-desk](https://github.com/ortusclub/ortus-profile-desk). Installers are published in [ortus-profile-desk-team](https://github.com/ortusclub/ortus-profile-desk-team). See [DEVELOPING.md](DEVELOPING.md).

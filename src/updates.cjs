@@ -26,21 +26,15 @@ class Updates {
     this.state = {version: app.getVersion(), status: 'idle', message: 'Checks automatically; downloads updates in the background.'};
   }
   set(status, message, details = {}) {this.state = {...this.state, status, message, ...details}; this.notify(this.state); return this.state;}
-  executable() {
-    const gh = ['/opt/homebrew/bin/gh', '/usr/local/bin/gh', '/usr/bin/gh'].find(p => fs.existsSync(p));
-    if (!gh) throw new Error('To enable private updates, install GitHub CLI (brew install gh), then run gh auth login in Terminal.');
-    return gh;
-  }
   async check() {
     if (this.busy || this.ready) return this.state;
     if (!this.app.isPackaged) return this.set('unavailable', 'Updates are available in the installed app.');
     this.busy = true; this.set('checking', 'Looking for a newer version…', {progress:null, downloaded:0, total:0});
     let work, mount, attached = false;
     try {
-      const gh = this.executable();
       let stdout;
-      try { ({stdout} = await this.run(gh, ['api', `repos/${REPO}/releases/latest`], {timeout: 30000, maxBuffer: 4 * 1024 * 1024})); }
-      catch {throw new Error('Cannot check private releases. Run gh auth login in Terminal and ensure your GitHub account has team repository access.');}
+      try { ({stdout} = await this.run('/usr/bin/curl', ['-fsSL', '--proto', '=https', '--proto-redir', '=https', '--max-time', '25', `https://api.github.com/repos/${REPO}/releases/latest`], {timeout: 30000, maxBuffer: 4 * 1024 * 1024})); }
+      catch {throw new Error('Cannot check for updates. Check your internet connection and try again shortly.');}
       const release = releaseInfo(JSON.parse(stdout), this.app.getVersion());
       if (!release) return this.set('current', 'You have the latest version.');
       this.set('downloading', `Downloading version ${release.version}. You can keep using the app.`, {targetVersion:release.version,total:release.size,progress:null});
@@ -53,7 +47,7 @@ class Updates {
         });
       };
       const timer = setInterval(report, 500); timer.unref();
-      try {await this.run(gh, ['release', 'download', release.tag, '--repo', REPO, '--pattern', ASSET, '--dir', work], {timeout: 15 * 60 * 1000});}
+      try {await this.run('/usr/bin/curl', ['-fsSL', '--proto', '=https', '--proto-redir', '=https', '--connect-timeout', '20', '--max-time', '850', `https://github.com/${REPO}/releases/download/${release.tag}/${ASSET}`, '-o', path.join(work, ASSET)], {timeout: 15 * 60 * 1000});}
       finally {clearInterval(timer);}
       this.set('verifying', 'Download complete. Checking the file and application signature…', {progress:100, downloaded:release.size});
       const hash = crypto.createHash('sha256');

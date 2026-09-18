@@ -1,7 +1,7 @@
 {
   "name": "profile-desk",
   "productName": "Ortus Profile Desk",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "description": "Independent local browser profiles with a GoLogin migration assistant",
   "main": "src/main.cjs",

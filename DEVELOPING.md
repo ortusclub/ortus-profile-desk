@@ -1,9 +1,9 @@
 # Working on Ortus Profile Desk
 
-App, backend and tests: https://github.com/ortusclub/ortus-profile-desk (private).
-Installer distribution: https://github.com/ortusclub/ortus-profile-desk-team (private).
+App, backend and tests: https://github.com/ortusclub/ortus-profile-desk (public).
+Installer distribution: https://github.com/ortusclub/ortus-profile-desk-team (public).
 
-Invite developers to the source repository. Team members who only need to install the app need access to the distribution repository.
+Give developers write access to the source repository as needed. Installation and updates are public and require no GitHub login. Workspace access separately requires the team key.
 
 ## Local development
 
@@ -18,3 +18,7 @@ Each colleague enters the workspace key once in the app. It is stored in the exi
 Names, folders and proxy credentials come from the account sheet on the server; sheet polling runs every five minutes. Installed apps refresh their catalog every ten seconds. Browser cookies/storage remain local in this version. New shared profiles and proxy changes propagate between Macs. A changed spreadsheet proxy replaces its previous value; a manual proxy override persists until the spreadsheet proxy changes again.
 
 Keep the Electron application name `Profile Desk` and bundle ID `local.profiledesk.app` to preserve the existing Keychain and vault identity. Changes to the product's visible name must not change its data location.
+
+## Publishing releases
+
+Run `npm run build:release`, then `node scripts/prepare-release.cjs`. Publish **both** `dist/Ortus-Profile-Desk-universal.dmg` and `dist/install.json` on the distribution repository release. The installer reads the latest manifest and downloads the pinned version after validating its format and checksum. Keep the public installer URL stable. Production credentials must never be committed or bundled.

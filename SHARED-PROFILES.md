@@ -1,6 +1,6 @@
 # Shared profiles
 
-Version 0.1.4 shares profile names, folders, proxy settings and newly created profiles through the existing Google Cloud server. Each colleague enters a workspace key once. Both GitHub repositories are private; neither contains production credentials.
+Version 0.1.4 shares profile names, folders, proxy settings and newly created profiles through the existing Google Cloud server. Each colleague enters a workspace key once. The app source and installers are public; neither contains production credentials. Workspace data requires the separately supplied key.
 
 ## Implemented
 
