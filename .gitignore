@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.DS_Store
+test-artifacts/
+.env
+.env.*
+!.env.example
+*.vault
+*.keychain*
+*.log
+data/
+backups/
+coverage/
