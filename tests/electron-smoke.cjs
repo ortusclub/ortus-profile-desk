@@ -96,6 +96,16 @@ app.whenReady().then(async () => {
     await window.webContents.executeJavaScript('refresh()');
     assert.equal(await window.webContents.executeJavaScript('document.querySelectorAll(".profile-card img").length'), 0);
     await new Promise(resolve => setTimeout(resolve, 300));
+    await window.webContents.executeJavaScript(`showUpdate({version:'0.1.5',targetVersion:'0.1.6',status:'downloading',progress:42,downloaded:98000000,total:233000000,message:'Downloading version 0.1.6. You can keep using the app.'}); openUpdateDetails();`);
+    const progressUI = await window.webContents.executeJavaScript(`({value:document.getElementById('update-detail-progress').value,step:document.querySelector('[aria-current=step] strong').textContent,button:document.getElementById('check-updates').textContent,overflow:document.documentElement.scrollWidth > innerWidth})`);
+    assert.deepEqual(progressUI,{value:42,step:'Download',button:'View update progress',overflow:false});
+    fs.mkdirSync(path.join(__dirname, '../test-artifacts'), {recursive: true});
+    fs.writeFileSync(path.join(__dirname, '../test-artifacts/update-progress.png'), (await window.webContents.capturePage()).toPNG());
+    await window.webContents.executeJavaScript(`showUpdate({version:'0.1.5',targetVersion:'0.1.6',status:'ready',message:'Close profile windows, then restart.'});`);
+    assert.equal(await window.webContents.executeJavaScript(`document.querySelectorAll('#update-steps .complete').length`),3);
+    assert.equal(await window.webContents.executeJavaScript(`document.getElementById('update-action').hidden`),false);
+    await window.webContents.executeJavaScript(`document.getElementById('update-dialog').close();showUpdate({version:'0.1.5',status:'current',message:'You have the latest version.'});`);
+    console.log('PASS: visible download progress, guided update stages, ready action and no horizontal overflow.');
     const screenshot = await window.webContents.capturePage();
     fs.mkdirSync(path.join(__dirname, '../test-artifacts'), {recursive: true});
     fs.writeFileSync(path.join(__dirname, '../test-artifacts/app.png'), screenshot.toPNG());

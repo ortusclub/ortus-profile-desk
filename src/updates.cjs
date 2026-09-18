@@ -18,14 +18,14 @@ function releaseInfo(release, current) {
   if (release.draft || release.prerelease || !newer(version, current)) return null;
   const asset = release.assets?.find(a => a.name === ASSET);
   if (!asset || !/^sha256:[a-f0-9]{64}$/.test(asset.digest || '')) throw new Error('This release has no verified Mac installer.');
-  return {version, tag: release.tag_name, digest: asset.digest};
+  return {version, tag: release.tag_name, digest: asset.digest, size: Number(asset.size) || 0};
 }
 class Updates {
   constructor(app, notify) {
     this.app = app; this.notify = notify; this.run = run; this.busy = false; this.ready = null;
     this.state = {version: app.getVersion(), status: 'idle', message: 'Checks automatically; downloads updates in the background.'};
   }
-  set(status, message) {this.state = {...this.state, status, message}; this.notify(this.state); return this.state;}
+  set(status, message, details = {}) {this.state = {...this.state, status, message, ...details}; this.notify(this.state); return this.state;}
   executable() {
     const gh = ['/opt/homebrew/bin/gh', '/usr/local/bin/gh', '/usr/bin/gh'].find(p => fs.existsSync(p));
     if (!gh) throw new Error('To enable private updates, install GitHub CLI (brew install gh), then run gh auth login in Terminal.');
@@ -34,7 +34,7 @@ class Updates {
   async check() {
     if (this.busy || this.ready) return this.state;
     if (!this.app.isPackaged) return this.set('unavailable', 'Updates are available in the installed app.');
-    this.busy = true; this.set('checking', 'Checking for updates…');
+    this.busy = true; this.set('checking', 'Looking for a newer version…', {progress:null, downloaded:0, total:0});
     let work, mount, attached = false;
     try {
       const gh = this.executable();
@@ -43,9 +43,19 @@ class Updates {
       catch {throw new Error('Cannot check private releases. Run gh auth login in Terminal and ensure your GitHub account has team repository access.');}
       const release = releaseInfo(JSON.parse(stdout), this.app.getVersion());
       if (!release) return this.set('current', 'You have the latest version.');
-      this.set('downloading', `Downloading version ${release.version}…`);
+      this.set('downloading', `Downloading version ${release.version}. You can keep using the app.`, {targetVersion:release.version,total:release.size,progress:null});
       work = fs.mkdtempSync(path.join(os.tmpdir(), 'ortus-update-')); fs.chmodSync(work, 0o700);
-      await this.run(gh, ['release', 'download', release.tag, '--repo', REPO, '--pattern', ASSET, '--dir', work], {timeout: 15 * 60 * 1000});
+      const report = () => {
+        let downloaded = 0;
+        try {downloaded = fs.statSync(path.join(work, ASSET)).size;} catch {}
+        this.set('downloading', `Downloading version ${release.version}. You can keep using the app.`, {
+          downloaded, total:release.size, progress:release.size ? Math.min(100,Math.floor(downloaded / release.size * 100)) : null
+        });
+      };
+      const timer = setInterval(report, 500); timer.unref();
+      try {await this.run(gh, ['release', 'download', release.tag, '--repo', REPO, '--pattern', ASSET, '--dir', work], {timeout: 15 * 60 * 1000});}
+      finally {clearInterval(timer);}
+      this.set('verifying', 'Download complete. Checking the file and application signature…', {progress:100, downloaded:release.size});
       const hash = crypto.createHash('sha256');
       for await (const chunk of fs.createReadStream(path.join(work, ASSET))) hash.update(chunk);
       if (`sha256:${hash.digest('hex')}` !== release.digest) throw new Error('The update failed download verification. Try again.');
@@ -57,6 +67,7 @@ class Updates {
         const {stdout: value} = await this.run('/usr/libexec/PlistBuddy', ['-c', `Print ${key}`, path.join(source, 'Contents/Info.plist')]);
         if (value.trim() !== expected) throw new Error('The update contains an unexpected application.');
       }
+      this.set('preparing', 'Verified. Preparing the update on this Mac…');
       const destination = path.resolve(this.app.getAppPath(), '../../..');
       if (path.basename(destination) !== 'Ortus Profile Desk.app' || !['/Applications', path.join(os.homedir(), 'Applications')].includes(path.dirname(destination))) throw new Error('Move the app to Applications before updating.');
       fs.accessSync(path.dirname(destination), fs.constants.W_OK); fs.accessSync(destination, fs.constants.W_OK);
@@ -68,7 +79,7 @@ class Updates {
         fs.copyFileSync(path.join(__dirname, 'update-install.sh'), path.join(staging, 'install.sh'));
       } catch (err) {fs.rmSync(staging, {recursive: true, force: true}); throw err;}
       this.ready = {staging, prepared, destination};
-      return this.set('ready', `Version ${release.version} is ready. Close profiles, then restart to update.`);
+      return this.set('ready', `Version ${release.version} is ready. Close your profile windows, then click Restart to update. The app will reopen automatically.`);
     } catch (err) {
       // Never expose CLI stderr: it can contain local credentials or environment details.
       return this.set('error', err.message.startsWith('Command failed:') ? 'The update could not be downloaded or prepared. Check your connection and try again.' : err.message.slice(0, 250));

@@ -147,14 +147,47 @@ perform(refresh);
 let updateState;
 function showUpdate(state) {
   updateState = state;
-  $('app-version').textContent = `ORTUS PROFILE DESK · V${state.version}`;
-  $('update-status').textContent = state.message;
-  $('check-updates').textContent = state.status === 'ready' ? 'Restart to update' : state.status === 'downloading' ? 'Downloading…' : 'Check for updates';
-  $('check-updates').disabled = ['checking', 'downloading'].includes(state.status);
+  const busy = ['checking','downloading','verifying','preparing'].includes(state.status);
+  const titles = {idle:'Automatic updates enabled',checking:'Checking for updates…',downloading:'Step 1 of 4 · Downloading',verifying:'Step 2 of 4 · Verifying',preparing:'Step 3 of 4 · Preparing',ready:'Step 4 of 4 · Ready to restart',current:'You’re up to date',error:'Update needs attention',unavailable:'Development build'};
+  const title = titles[state.status] || 'App update';
+  const bytes = n => `${(n / 1000000).toFixed(1)} MB`;
+  const transfer = state.status === 'downloading' && state.total > 0 ? `${state.progress ?? 0}% · ${bytes(state.downloaded || 0)} of ${bytes(state.total)}` : '';
+  $('app-version').textContent = `v${state.version}`;
+  $('update-summary').textContent = title;
+  $('update-status').textContent = transfer || (state.status === 'ready' ? 'Close profiles, then restart below.' : state.status === 'error' ? 'Open details to retry.' : busy ? 'You can keep using the app.' : 'Checks automatically every four hours.');
+  $('check-updates').textContent = state.status === 'ready' ? 'Restart to update' : busy ? 'View update progress' : state.status === 'error' ? 'View update details' : 'Check for updates';
+  $('check-updates').disabled = false;
+  $('update-version-detail').textContent = state.targetVersion ? `Version ${state.version} → ${state.targetVersion}` : `Installed version ${state.version}`;
+  $('update-detail-title').textContent = title;
+  $('update-detail-status').textContent = [transfer, state.message].filter(Boolean).join(' — ');
+  for (const id of ['update-progress','update-detail-progress']) {
+    const bar = $(id);bar.hidden = !['downloading','verifying','preparing'].includes(state.status);
+    if (state.status === 'downloading' && Number.isFinite(state.progress)) bar.value = state.progress;
+    else bar.removeAttribute('value');
+  }
+  const stages = ['downloading','verifying','preparing','ready'];
+  const index = stages.indexOf(state.status);
+  document.querySelectorAll('[data-update-step]').forEach((row,i) => {
+    row.className = index > i ? 'complete' : index === i ? 'current' : '';
+    row.querySelector('span').textContent = index > i ? '✓' : String(i + 1);
+    if (index === i) row.setAttribute('aria-current','step'); else row.removeAttribute('aria-current');
+  });
+  $('update-action').hidden = !['ready','error'].includes(state.status);
+  $('update-action').textContent = state.status === 'ready' ? 'Restart to update' : 'Try again';
 }
+function openUpdateDetails() {if (!$('update-dialog').open) $('update-dialog').showModal();}
 $('check-updates').onclick = () => perform(async () => {
-  if (updateState?.status === 'ready') await window.desk.call('updates:install');
-  else showUpdate(await window.desk.call('updates:check'));
+  openUpdateDetails();
+  if (!['checking','downloading','verifying','preparing','ready','error'].includes(updateState?.status)) showUpdate(await window.desk.call('updates:check'));
+});
+$('update-action').onclick = () => perform(async () => {
+  $('update-action').disabled = true;
+  try {
+    if (updateState?.status === 'ready') {
+      await window.desk.call('updates:install');
+      $('update-detail-status').textContent = 'Restarting now. Ortus Profile Desk will reopen automatically.';
+    } else showUpdate(await window.desk.call('updates:check'));
+  } finally {$('update-action').disabled = false;}
 });
 window.desk.onUpdates(showUpdate);
 perform(async () => showUpdate(await window.desk.call('updates:status')));
