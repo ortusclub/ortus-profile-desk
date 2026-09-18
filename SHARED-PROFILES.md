@@ -1,42 +1,26 @@
-# Shared profiles: planned next step
+# Shared profiles
 
-Status: shared service not deployed. The current application stores profiles on one Mac. A tested spreadsheet mapper is implemented in `src/sheet-profiles.cjs`.
+Version 0.1.4 shares profile names, folders, proxy settings and newly created profiles through the existing Google Cloud server. Each colleague enters a workspace key once. Both GitHub repositories are private; neither contains production credentials.
 
-## Requested behavior
+## Implemented
 
-- One shared Ortus workspace and profile list across installations.
-- Everyone granted access to that workspace can use the same profiles.
-- No individual login screen in the initial version.
-- Individual accounts and permissions can be introduced later.
-- Code and Mac installers are distributed through GitHub; live profile data is stored separately.
+- The server maintains the shared catalog on a separate encrypted persistent volume.
+- Active account-sheet rows are imported every five minutes. The account tab must be specified using its gid.
+- Email provides stable identity; Full Name supplies the display name. VM Account supplies the folder; blank values use Unassigned.
+- Proxy Details supplies host, port, username and password. Malformed values block opening. Blank values use direct connections.
+- Account passwords and 2FA columns are excluded.
+- Inactive accounts are archived, preserving their data. Empty or invalid sheet results do not erase the previous catalog.
+- Apps refresh every ten seconds and save an encrypted local catalog. New shared profiles and settings changes propagate across Macs.
+- Edits use version checks to reject stale overwrites. Open browsers retain their current local settings until closed.
+- Every shared profile is checked against the server before opening, so inactive accounts cannot be opened from an old offline catalog.
+- Workspace keys are entered manually and stored in the existing Keychain-encrypted vault. The installer contains no access keys.
 
-## Decisions needed
+## Still to implement
 
-1. Choose the shared-service host: an existing Ortus server or a new hosted service.
-2. Confirm whether synchronization means profile lists/settings/saved sessions or live browser mirroring.
+Browser cookies and site storage remain local. Saved-session transfer between Macs, exclusive browser locks with recovery, and live browser mirroring are not enabled. Backend snapshot and locking routes are disabled by default until portable session transfer and recovery have been implemented and tested.
 
-Confirmed: different team Macs, no personal logins initially, a private team-only installer with preconfigured workspace access. Public generic source remains separate. Private release repository: `ortusclub/ortus-profile-desk-team`.
+Portable session transfer must handle Chrome's machine-specific cookie encryption; copying its entire directory alone is insufficient. Failed uploads must preserve unsaved local state and prevent conflicting writes. Session transfer must be tested before enabling these routes.
 
-## Implementation requirements
+Exact GoLogin fingerprint cloning and device-bound sign-in transfer are not supported.
 
-- A shared profile service provides the canonical list, metadata and saved session snapshots.
-- Each installation receives a workspace connection configuration. No personal account is needed initially. Workspace credentials must not be committed or baked into publicly downloadable builds.
-- Opening a profile acquires an exclusive server-side lock before downloading its latest saved state. Closing saves a new version before releasing the lock.
-- Failed uploads retain the local copy and expose a retry action. They must not report a successful save or permit conflicting edits silently.
-- Connection failures and stale locks require explicit recovery behavior. Profile versions prevent an old client overwriting newer data.
-- Cookie transfer must account for Chrome’s machine-specific encryption. Copying the Chrome directory alone is not a portable session-transfer solution.
-- Stored profile data must be protected in transit and on the server. Keep the API structured around workspace membership so account authentication can be added later.
-
-Exact GoLogin fingerprint cloning and device-bound sign-in transfer remain outside the current app’s capabilities.
-
-## Sheet mapping
-
-- Use the selected account tab, not the spreadsheet overview tab.
-- Select rows whose trimmed Status equals Active, case-insensitively.
-- Use Email as the stable account identifier and Full Name as the display name.
-- Group by the trimmed VM Account value; blank values belong to Unassigned.
-- Read supported proxy strings from Proxy Details. Invalid proxies block opening.
-- Do not import account passwords or 2FA columns.
-- Preserve profile identity across row reordering, renaming, and folder changes.
-- Duplicate active emails or missing required identifiers block the sync rather than mix account sessions.
-- The live spreadsheet URL and rows are runtime configuration/data; do not publish them in source or releases.
+See [DEVELOPING.md](DEVELOPING.md) for repositories, tests and server configuration.
